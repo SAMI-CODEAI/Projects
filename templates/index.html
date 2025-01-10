@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Career Path Analyzer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <h1>Career Path Analyzer</h1>
+        <div class="form-container">
+            <input type="text" id="name" placeholder="Your Name">
+            <input type="text" id="skills" placeholder="Your Skills (comma-separated)">
+            <select id="specialization">
+                <option value="">Select Specialization</option>
+                <option value="AI">AI/Machine Learning</option>
+                <option value="Web Development">Web Development</option>
+                <option value="Cybersecurity">Cybersecurity</option>
+                <option value="Data Science">Data Science</option>
+            </select>
+            <input type="number" id="experience" placeholder="Years of Experience">
+            <button onclick="submitForm()">Analyze Profile</button>
+        </div>
+
+        <div id="results" style="display: none;">
+            <div class="section">
+                <div class="section-title">Learning Roadmap</div>
+                <div id="flowchart" class="results-container"></div>
+            </div>
+            
+            <div class="section">
+                <div class="section-title">Profile Comparisons</div>
+                <div id="comparisons" class="results-container"></div>
+            </div>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html> 

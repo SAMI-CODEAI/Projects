@@ -1,0 +1,14 @@
+
+
+Project for 2nd 1 sem :
+\
+https://github.com/vancanhuit/simple-data-compression?tab=readme-ov-file#test-data
+
+
+code developing file compression tool using python and React.js ,aims to optimize storage usage, improve file transfer speeds and reduce bandwidth consumption without compromising the quality of the compressed files.
+
+By implementing advanced compression algorithms, the project ensures efficiency and usability across multiple file types, including text, images, audio, and video. 
+
+provide with full code details
+
+give full detail steps to develop using python, react.js and run the application as a project in vccode

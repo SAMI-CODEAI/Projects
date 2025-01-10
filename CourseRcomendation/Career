@@ -1,0 +1,733 @@
+import sqlite3
+from flask import Flask, request, jsonify, render_template_string
+from datetime import datetime
+
+app = Flask(__name__)
+DATABASE = 'course_recommendations.db'
+
+class SkillAnalyzer:
+    def __init__(self, user_skills, specialization):
+        self.user_skills = set(skill.strip().lower() for skill in user_skills.split(",") if skill.strip())
+        self.specialization = specialization
+        self.conn = sqlite3.connect(DATABASE)
+        self.cursor = self.conn.cursor()
+
+    def get_career_path(self):
+        """Generate a personalized career path with milestones."""
+        try:
+            # Get all skills for specialization ordered by difficulty
+            self.cursor.execute("""
+                SELECT skill, difficulty, estimated_hours, prerequisites
+                FROM skill_details 
+                WHERE specialization = ?
+                ORDER BY CASE 
+                    WHEN difficulty = 'Beginner' THEN 1
+                    WHEN difficulty = 'Intermediate' THEN 2
+                    WHEN difficulty = 'Advanced' THEN 3
+                END
+            """, (self.specialization,))
+            
+            skills = self.cursor.fetchall()
+            
+            # Organize skills into learning phases
+            beginner_skills = []
+            intermediate_skills = []
+            advanced_skills = []
+            
+            for skill in skills:
+                skill_name, difficulty, hours, prereqs = skill
+                skill_info = {
+                    "name": skill_name,
+                    "estimated_hours": hours,
+                    "prerequisites": prereqs.split(", "),
+                    "completed": skill_name in self.user_skills
+                }
+                
+                if difficulty == "Beginner":
+                    beginner_skills.append(skill_info)
+                elif difficulty == "Intermediate":
+                    intermediate_skills.append(skill_info)
+                else:
+                    advanced_skills.append(skill_info)
+            
+            return {
+                "career_path": {
+                    "Phase 1 - Foundation": beginner_skills,
+                    "Phase 2 - Professional": intermediate_skills,
+                    "Phase 3 - Expert": advanced_skills
+                },
+                "current_phase": self._determine_current_phase(beginner_skills, intermediate_skills, advanced_skills),
+                "completion_percentage": self._calculate_completion_percentage(skills)
+            }
+        except Exception as e:
+            return {"error": f"Error generating career path: {str(e)}"}
+
+    def get_skill_recommendations(self):
+        """Get personalized skill recommendations."""
+        try:
+            self.cursor.execute("""
+                SELECT s.skill, s.description, s.difficulty, s.estimated_hours,
+                       s.industry_demand, s.salary_impact, s.career_impact
+                FROM skill_details s
+                WHERE s.specialization = ?
+                AND s.skill NOT IN ({})
+                ORDER BY 
+                    CASE s.difficulty
+                        WHEN 'Beginner' THEN 1
+                        WHEN 'Intermediate' THEN 2
+                        WHEN 'Advanced' THEN 3
+                    END
+            """.format(','.join('?' * (len(self.user_skills) or 1))),
+            [self.specialization] + list(self.user_skills or ['']))
+            
+            recommendations = []
+            for row in self.cursor.fetchall():
+                recommendations.append({
+                    "skill": row[0],
+                    "description": row[1],
+                    "difficulty": row[2],
+                    "time_investment": row[3],
+                    "industry_demand": row[4],
+                    "salary_impact": row[5],
+                    "career_impact": row[6]
+                })
+            
+            return recommendations
+        except Exception as e:
+            return {"error": f"Error getting recommendations: {str(e)}"}
+
+    def get_learning_resources(self, skill):
+        """Get curated learning resources for a specific skill."""
+        try:
+            self.cursor.execute("""
+                SELECT resources, learning_path, tools, best_practices
+                FROM skill_details
+                WHERE skill = ? AND specialization = ?
+            """, (skill, self.specialization))
+            
+            result = self.cursor.fetchone()
+            if result:
+                return {
+                    "resources": result[0].split(", "),
+                    "learning_path": result[1].split("\n"),
+                    "tools": result[2].split(", "),
+                    "best_practices": result[3].split(", ")
+                }
+            return None
+        except Exception as e:
+            return {"error": f"Error getting learning resources: {str(e)}"}
+
+    def _determine_current_phase(self, beginner, intermediate, advanced):
+        """Determine user's current learning phase."""
+        completed_beginner = sum(1 for skill in beginner if skill["completed"])
+        completed_intermediate = sum(1 for skill in intermediate if skill["completed"])
+        completed_advanced = sum(1 for skill in advanced if skill["completed"])
+        
+        if completed_advanced > 0:
+            return "Expert"
+        elif completed_intermediate > 0:
+            return "Professional"
+        else:
+            return "Foundation"
+
+    def _calculate_completion_percentage(self, skills):
+        """Calculate overall completion percentage."""
+        total_skills = len(skills)
+        completed_skills = len(self.user_skills)
+        return round((completed_skills / total_skills * 100) if total_skills > 0 else 0, 1)
+
+    def __del__(self):
+        """Close database connection."""
+        self.conn.close()
+
+@app.route('/analyze', methods=['POST'])
+def analyze_skills():
+    """Analyze user skills and provide comprehensive feedback."""
+    try:
+        data = request.get_json()
+        if not data or 'skills' not in data or 'specialization' not in data:
+            return jsonify({"error": "Missing required data"}), 400
+
+        analyzer = SkillAnalyzer(data['skills'], data['specialization'])
+        
+        career_path = analyzer.get_career_path()
+        recommendations = analyzer.get_skill_recommendations()
+        
+        # Get learning resources for recommended skills
+        learning_resources = {}
+        for rec in recommendations[:3]:  # Get resources for top 3 recommendations
+            resources = analyzer.get_learning_resources(rec['skill'])
+            if resources:
+                learning_resources[rec['skill']] = resources
+
+        response = {
+            "timestamp": datetime.now().isoformat(),
+            "career_path": career_path,
+            "recommendations": recommendations,
+            "learning_resources": learning_resources,
+            "next_steps": {
+                "immediate_focus": recommendations[0]['skill'] if recommendations else None,
+                "estimated_completion_time": sum(rec['time_investment'] for rec in recommendations[:3]),
+                "potential_salary_impact": recommendations[0]['salary_impact'] if recommendations else None
+            }
+        }
+        
+        return jsonify(response)
+    except Exception as e:
+        return jsonify({"error": f"Analysis failed: {str(e)}"}), 500
+
+@app.route('/')
+def index():
+    return render_template_string(HTML_TEMPLATE)
+
+def init_db():
+    """Initialize the database with comprehensive skill details."""
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    
+    # Drop and recreate tables
+    cursor.execute("DROP TABLE IF EXISTS users")
+    cursor.execute("DROP TABLE IF EXISTS courses")
+    cursor.execute("DROP TABLE IF EXISTS skill_details")
+    
+    # Create tables (same as before)
+    cursor.execute("""CREATE TABLE users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        skills TEXT NOT NULL,
+        specialization TEXT NOT NULL,
+        experience_years INTEGER,
+        company TEXT
+    )""")
+    
+    cursor.execute("""CREATE TABLE courses (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        skill TEXT NOT NULL,
+        specialization TEXT NOT NULL,
+        platform TEXT,
+        url TEXT,
+        difficulty TEXT,
+        instructor TEXT,
+        duration TEXT,
+        description TEXT,
+        rating FLOAT
+    )""")
+    
+    cursor.execute("""CREATE TABLE skill_details (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        skill TEXT NOT NULL,
+        specialization TEXT NOT NULL,
+        description TEXT,
+        prerequisites TEXT,
+        difficulty TEXT,
+        estimated_hours INTEGER,
+        learning_path TEXT,
+        resources TEXT,
+        career_impact TEXT,
+        industry_demand TEXT,
+        salary_impact TEXT,
+        related_skills TEXT,
+        best_practices TEXT,
+        tools TEXT
+    )""")
+
+    # Enhanced skill details with comprehensive information
+    skill_details = [
+        # AI/Machine Learning Skills
+        ("machine learning", "AI", 
+         "Core concepts of ML including supervised/unsupervised learning, model evaluation, and deployment",
+         "Python, Statistics, Linear Algebra, Calculus",
+         "Intermediate", 120,
+         "1. Mathematics for ML\n2. Python Programming\n3. Data Preprocessing\n4. ML Algorithms\n5. Model Evaluation\n6. Deployment",
+         "Coursera ML Course, Fast.ai, scikit-learn documentation, Kaggle competitions",
+         "Essential for AI Engineer, Data Scientist, and ML Engineer roles",
+         "Very High - Growing demand across industries",
+         "Can increase salary by 20-40% in technical roles",
+         "Deep Learning, Neural Networks, Data Mining, Feature Engineering",
+         "Model validation, Cross-validation, Feature selection, Regularization",
+         "scikit-learn, TensorFlow, PyTorch, Keras"),
+        
+        ("deep learning", "AI",
+         "Advanced neural network architectures and their applications in AI",
+         "Machine Learning, Python, Advanced Mathematics",
+         "Advanced", 160,
+         "1. Neural Network Basics\n2. CNNs\n3. RNNs\n4. Transformers\n5. GANs\n6. Model Optimization",
+         "Deep Learning Specialization, PyTorch tutorials, Research papers, DL blogs",
+         "Critical for Computer Vision, NLP, and AI Research positions",
+         "Very High - Especially in tech giants and AI research",
+         "Premium skill commanding 30-50% higher salaries",
+         "Computer Vision, NLP, Reinforcement Learning",
+         "Model architecture design, Hyperparameter tuning, Transfer learning",
+         "TensorFlow, PyTorch, CUDA, TPUs"),
+
+        # Web Development Skills
+        ("react", "Web Development",
+         "Modern JavaScript library for building user interfaces and single-page applications",
+         "JavaScript, HTML, CSS, ES6+",
+         "Intermediate", 100,
+         "1. JSX and Components\n2. State & Props\n3. Hooks\n4. Context API\n5. Redux\n6. Performance Optimization",
+         "React Documentation, Egghead.io, Frontend Masters, React Patterns",
+         "High demand for frontend and full-stack development roles",
+         "Very High - Standard in modern web development",
+         "15-30% salary premium for React specialists",
+         "Redux, TypeScript, Next.js, React Native",
+         "Component composition, State management, Code splitting",
+         "Create React App, Redux DevTools, React Router"),
+
+        # Cybersecurity Skills
+        ("penetration testing", "Cybersecurity",
+         "Systematic process of finding and exploiting security vulnerabilities",
+         "Networking, Linux, Programming, Security Fundamentals",
+         "Advanced", 160,
+         "1. Reconnaissance\n2. Scanning\n3. Exploitation\n4. Post-exploitation\n5. Reporting\n6. Remediation",
+         "HackTheBox, TryHackMe, OWASP Resources, PentesterLab",
+         "Essential for Security Analyst and Penetration Tester roles",
+         "High - Critical for organizational security",
+         "Premium skill with 25-40% higher compensation",
+         "Network Security, Web Security, Malware Analysis",
+         "Systematic approach, Documentation, Ethical considerations",
+         "Metasploit, Burp Suite, Nmap, Wireshark"),
+
+        # Data Science Skills
+        ("data visualization", "Data Science",
+         "Art and science of representing data through visual elements",
+         "Statistics, Basic Programming, Design Principles",
+         "Intermediate", 80,
+         "1. Visual Design Principles\n2. Tool Mastery\n3. Interactive Viz\n4. Storytelling\n5. Advanced Techniques",
+         "Tableau Tutorials, D3.js Documentation, Data Viz blogs",
+         "Critical for Data Analyst and Business Intelligence roles",
+         "High - Essential for data-driven decision making",
+         "10-25% salary increase for visualization experts",
+         "Business Intelligence, Statistical Analysis, UX Design",
+         "Clear communication, User-centric design, Accessibility",
+         "Tableau, Power BI, D3.js, Python visualization libraries"),
+
+        # Additional skills for each specialization...
+    ]
+    
+    cursor.executemany("""
+        INSERT INTO skill_details (
+            skill, specialization, description, prerequisites, difficulty,
+            estimated_hours, learning_path, resources, career_impact,
+            industry_demand, salary_impact, related_skills, best_practices, tools
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, skill_details)
+
+    # Update the suggest route to include enhanced skill details
+    @app.route("/suggest", methods=["POST"])
+    def suggest():
+        # ... existing code ...
+        
+        cursor.execute("""
+            SELECT 
+                skill, description, prerequisites, difficulty, estimated_hours,
+                learning_path, resources, career_impact, industry_demand,
+                salary_impact, related_skills, best_practices, tools
+            FROM skill_details
+            WHERE skill IN ({})
+        """.format(','.join('?' * len(missing_skills))), 
+        list(missing_skills))
+        
+        skill_details = {row[0]: {
+            "description": row[1],
+            "prerequisites": row[2].split(", "),
+            "difficulty": row[3],
+            "estimated_hours": row[4],
+            "learning_path": row[5].split("\n"),
+            "resources": row[6].split(", "),
+            "career_impact": row[7],
+            "industry_demand": row[8],
+            "salary_impact": row[9],
+            "related_skills": row[10].split(", "),
+            "best_practices": row[11].split(", "),
+            "tools": row[12].split(", ")
+        } for row in cursor.fetchall()}
+        
+        return jsonify({
+            "missing_skills": [{
+                "name": skill,
+                "details": skill_details.get(skill, {})
+            } for skill in sorted(list(missing_skills))],
+            "profile_comparisons": profile_comparisons,
+            "course_recommendations": course_recommendations,
+            "analysis_summary": {
+                "total_skills_needed": len(all_required_skills),
+                "skills_matched": len(user_skills.intersection(all_required_skills)),
+                "skills_missing": len(missing_skills),
+                "estimated_learning_hours": sum(
+                    skill_details.get(skill, {}).get("estimated_hours", 0) 
+                    for skill in missing_skills
+                ),
+                "overall_progress": round(
+                    (len(user_skills.intersection(all_required_skills)) / len(all_required_skills) * 100)
+                    if all_required_skills else 0, 1
+                )
+            }
+        })
+
+    conn.commit()
+    conn.close()
+
+<script>
+    function submitForm() {
+        const formData = {
+            name: document.getElementById("name").value,
+            skills: document.getElementById("skills").value,
+            specialization: document.getElementById("specialization").value,
+            experience: document.getElementById("experience").value
+        };
+
+        document.getElementById("results").style.display = "none";
+
+        fetch('/suggest', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(formData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById("results").style.display = "block";
+            
+            const flowchart = document.getElementById("flowchart");
+            const comparisons = document.getElementById("comparisons");
+            const courses = document.getElementById("courses");
+            
+            flowchart.innerHTML = "";
+            comparisons.innerHTML = "";
+            courses.innerHTML = "";
+
+            // Display missing skills
+            if (data.missing_skills.length === 0) {
+                flowchart.innerHTML = `
+                    <div class="step fade-in">
+                        <h4>Excellent Profile!</h4>
+                        <p>You have all the core skills for this specialization.</p>
+                    </div>
+                `;
+            } else {
+                data.missing_skills.forEach((skill, index) => {
+                    const step = document.createElement("div");
+                    step.className = "step fade-in";
+                    step.style.animationDelay = `${index * 0.1}s`;
+                    step.innerHTML = `
+                        <h4>${skill.name}</h4>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 0%"></div>
+                        </div>
+                        <div class="skill-details">
+                            <p>${skill.details.description}</p>
+                            <p><strong>Prerequisites:</strong> ${skill.details.prerequisites.join(", ")}</p>
+                            <p><strong>Difficulty:</strong> ${skill.details.difficulty}</p>
+                            <p><strong>Estimated Hours:</strong> ${skill.details.estimated_hours}</p>
+                            <p><strong>Learning Path:</strong> ${skill.details.learning_path.join(", ")}</p>
+                            <p><strong>Resources:</strong> ${skill.details.resources.join(", ")}</p>
+                            <p><strong>Career Impact:</strong> ${skill.details.career_impact}</p>
+                            <p><strong>Industry Demand:</strong> ${skill.details.industry_demand}</p>
+                            <p><strong>Salary Impact:</strong> ${skill.details.salary_impact}</p>
+                            <p><strong>Related Skills:</strong> ${skill.details.related_skills.join(", ")}</p>
+                            <p><strong>Best Practices:</strong> ${skill.details.best_practices.join(", ")}</p>
+                            <p><strong>Tools:</strong> ${skill.details.tools.join(", ")}</p>
+                        </div>
+                    `;
+                    flowchart.appendChild(step);
+                    
+                    // Animate progress bar
+                    setTimeout(() => {
+                        step.querySelector('.progress-fill').style.width = '100%';
+                    }, 100);
+                });
+            }
+
+            // Display profile comparisons
+            data.profile_comparisons.forEach((profile, index) => {
+                const profileDiv = document.createElement("div");
+                profileDiv.className = "profile-card fade-in";
+                profileDiv.style.animationDelay = `${index * 0.1}s`;
+                
+                const initials = profile.name.split(' ').map(n => n[0]).join('');
+                
+                profileDiv.innerHTML = `
+                    <div class="profile-header">
+                        <div class="profile-avatar">${initials}</div>
+                        <div class="profile-info">
+                            <h4 class="profile-name">${profile.name}</h4>
+                            <div class="profile-company">${profile.company}</div>
+                        </div>
+                    </div>
+                    
+                    <div class="profile-stats">
+                        <div class="stat-item">
+                            <div class="stat-value">${profile.experience_years}+</div>
+                            <div class="stat-label">Years Experience</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">${profile.similarity_score}%</div>
+                            <div class="stat-label">Profile Match</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">${profile.common_skills.length}</div>
+                            <div class="stat-label">Shared Skills</div>
+                        </div>
+                    </div>
+
+                    <div class="match-indicator">
+                        <span class="match-label">Profile Match</span>
+                        <div class="match-bar">
+                            <div class="progress-fill" style="width: ${profile.similarity_score}%"></div>
+                        </div>
+                        <span class="match-value">${profile.similarity_score}%</span>
+                    </div>
+
+                    <div class="skills-section">
+                        <div class="skills-title">Shared Skills</div>
+                        <div class="skills">
+                            ${profile.common_skills.map(skill => 
+                                `<span class="skill-tag">${skill}</span>`
+                            ).join('')}
+                        </div>
+                    </div>
+
+                    <div class="skills-section">
+                        <div class="skills-title">Skills to Acquire</div>
+                        <div class="skills">
+                            ${profile.missing_skills.map(skill => 
+                                `<span class="skill-tag" style="background: rgba(255, 87, 87, 0.1); color: #ff5757;">
+                                    ${skill}
+                                </span>`
+                            ).join('')}
+                        </div>
+                    </div>
+                `;
+                comparisons.appendChild(profileDiv);
+            });
+
+            // Display course recommendations
+            data.course_recommendations.forEach((course, index) => {
+                const courseDiv = document.createElement("div");
+                courseDiv.className = "step fade-in";
+                courseDiv.style.animationDelay = `${index * 0.1}s`;
+                courseDiv.innerHTML = `
+                    <h4>${course.name}</h4>
+                    <div class="course-platform">
+                        <span class="platform-tag">${course.platform}</span>
+                        ${course.certification ? '<span class="cert-tag">Certification</span>' : ''}
+                    </div>
+                    <div class="course-stats">
+                        <div class="stat">
+                            <i class="fas fa-star"></i>
+                            ${course.rating} (${(course.reviews_count/1000).toFixed(1)}k reviews)
+                        </div>
+                        <div class="stat">
+                            <i class="fas fa-clock"></i>
+                            ${course.duration_weeks} weeks
+                        </div>
+                        <div class="stat">
+                            <i class="fas fa-tag"></i>
+                            ${course.is_paid ? '$' + course.price : 'Free'}
+                        </div>
+                    </div>
+                    <div class="skill-tags">
+                        <span class="skill-tag">${course.skill}</span>
+                        <span class="difficulty-tag ${course.difficulty.toLowerCase()}">${course.difficulty}</span>
+                    </div>
+                    <p class="course-description">${course.description}</p>
+                    <div class="prerequisites">
+                        <strong>Prerequisites:</strong> ${course.prerequisites}
+                    </div>
+                    <a href="${course.url}" target="_blank" class="course-link">
+                        Learn More →
+                    </a>
+                `;
+                courses.appendChild(courseDiv);
+            });
+        })
+        .catch(error => console.error('Error:', error));
+    }
+
+    function createFlowchart(learningPath) {
+        const container = document.getElementById('flowchart');
+        container.innerHTML = `
+            <div id="network-container" style="height: 600px; background: var(--card-bg); border-radius: 12px;"></div>
+            <div id="node-details" class="node-details"></div>
+        `;
+
+        // Create nodes and edges
+        const nodes = new vis.DataSet();
+        const edges = new vis.DataSet();
+
+        learningPath.forEach(path => {
+            // Add node
+            nodes.add({
+                id: path.id,
+                label: path.topic,
+                level: Math.floor(path.order),
+                color: {
+                    background: path.difficulty === 'Beginner' ? '#4CAF50' :
+                               path.difficulty === 'Intermediate' ? '#FFA726' : '#F44336',
+                    border: '#ffffff',
+                    highlight: {
+                        background: '#81C784',
+                        border: '#ffffff'
+                    }
+                },
+                font: { color: '#ffffff' }
+            });
+
+            // Add edge if there's a parent
+            if (path.parent) {
+                const parentNode = learningPath.find(p => p.topic === path.parent);
+                if (parentNode) {
+                    edges.add({
+                        from: parentNode.id,
+                        to: path.id,
+                        arrows: 'to',
+                        color: { color: '#ffffff', opacity: 0.6 }
+                    });
+                }
+            }
+        });
+
+        // Network configuration
+        const options = {
+            layout: {
+                hierarchical: {
+                    direction: 'LR',
+                    sortMethod: 'directed',
+                    levelSeparation: 200,
+                    nodeSpacing: 150
+                }
+            },
+            nodes: {
+                shape: 'box',
+                margin: 10,
+                widthConstraint: {
+                    minimum: 120,
+                    maximum: 120
+                }
+            },
+            edges: {
+                smooth: {
+                    type: 'cubicBezier',
+                    forceDirection: 'horizontal'
+                }
+            },
+            physics: false,
+            interaction: {
+                hover: true,
+                tooltipDelay: 200
+            }
+        };
+
+        // Create network
+        const network = new vis.Network(
+            document.getElementById('network-container'),
+            { nodes, edges },
+            options
+        );
+
+        // Handle node clicks
+        network.on('click', function(params) {
+            if (params.nodes.length) {
+                const nodeId = params.nodes[0];
+                const pathData = learningPath.find(p => p.id === nodeId);
+                showNodeDetails(pathData);
+            }
+        });
+    }
+
+    function showNodeDetails(pathData) {
+        const detailsContainer = document.getElementById('node-details');
+        detailsContainer.innerHTML = `
+            <div class="topic-card fade-in">
+                <h3>${pathData.topic}</h3>
+                <div class="difficulty-tag ${pathData.difficulty.toLowerCase()}">
+                    ${pathData.difficulty}
+                </div>
+                <p class="description">${pathData.description}</p>
+                <div class="stats">
+                    <div class="stat-item">
+                        <span class="stat-label">Estimated Time</span>
+                        <span class="stat-value">${pathData.hours} hours</span>
+                    </div>
+                </div>
+                <div class="resources">
+                    <h4>Learning Resources</h4>
+                    <div class="resource-list">
+                        ${pathData.resources.map(resource => `
+                            <div class="resource-item">
+                                <span class="resource-icon">📚</span>
+                                ${resource}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function displayCourses(courses) {
+        const courseContainer = document.getElementById('courseContainer');
+        courseContainer.innerHTML = ''; // Clear previous results
+        
+        // Add section header for paid courses
+        if (courses.paid_courses && courses.paid_courses.length > 0) {
+            const paidHeader = document.createElement('h3');
+            paidHeader.textContent = 'Premium Courses';
+            paidHeader.className = 'section-header';
+            courseContainer.appendChild(paidHeader);
+            
+            // Display paid courses
+            courses.paid_courses.forEach(course => {
+                const courseCard = createCourseCard(course, true);
+                courseContainer.appendChild(courseCard);
+            });
+        }
+        
+        // Add section header for free courses
+        if (courses.free_courses && courses.free_courses.length > 0) {
+            const freeHeader = document.createElement('h3');
+            freeHeader.textContent = 'Free Learning Resources';
+            freeHeader.className = 'section-header';
+            courseContainer.appendChild(freeHeader);
+            
+            // Display free courses
+            courses.free_courses.forEach(course => {
+                const courseCard = createCourseCard(course, false);
+                courseContainer.appendChild(courseCard);
+            });
+        }
+    }
+
+    function createCourseCard(course, isPaid) {
+        const card = document.createElement('div');
+        card.className = 'course-card';
+        
+        const title = course.name || course.title;
+        const rating = course.rating ? `${course.rating}/5` : 'Not rated';
+        
+        card.innerHTML = `
+            <h3>${title}</h3>
+            <p><strong>Instructor:</strong> ${course.instructor}</p>
+            <p><strong>Platform:</strong> ${course.platform}</p>
+            <p><strong>Duration:</strong> ${course.duration}</p>
+            <p><strong>Rating:</strong> ${rating}</p>
+            ${isPaid ? `<p><strong>Price:</strong> $${course.price}</p>` : 
+                       `<p><strong>Skill Level:</strong> ${course.skill_level}</p>
+                        <p><a href="${course.url}" target="_blank" class="course-link">Access Course</a></p>`}
+            <p class="course-description">${course.description}</p>
+        `;
+        
+        return card;
+    }
+</script>
+</body>
+</html>
+'''
+
+if __name__ == '__main__':
+    init_db()
+    app.run(debug=True)
+
