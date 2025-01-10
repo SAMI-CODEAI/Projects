@@ -739,28 +739,13 @@ HTML_TEMPLATE = '''
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
-
-        .title-container {
-            text-align: center;
-        }
-
-        .site-subtitle {
-            color: var(--primary);
-            margin: 0;
-            font-size: 1em;
-            opacity: 0.8;
-            margin-top: -5px;
-        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="site-header">
             <i class="fas fa-brain site-icon"></i>
-            <div class="title-container">
-                <h1 class="site-title">Career Path Advisor</h1>
-                <p class="site-subtitle">Course Recommendations</p>
-            </div>
+            <h1 class="site-title">Career Path Advisor</h1>
         </div>
         
         <div class="form-container">
@@ -864,7 +849,7 @@ HTML_TEMPLATE = '''
                                     <div class="step-content">
                                         <div class="step-header">
                                             <h4 class="step-title">${skill}</h4>
-                                            <span class="step-duration">Estimated: ${getSkillTimeEstimate(skill)} weeks</span>
+                                            <span class="step-duration">Estimated: 4-6 weeks</span>
                                         </div>
                                         <p class="step-description">
                                             ${getSkillDescription(skill, data.specialization)}
@@ -1281,53 +1266,6 @@ HTML_TEMPLATE = '''
                 }
             ];
         }
-
-        function getSkillTimeEstimate(skill) {
-            const timeEstimates = {
-                // AI/ML skill estimates
-                'keras': "2-3",
-                'tensorflow': "4-6",
-                'pytorch': "3-4",
-                'deep learning': "8-12",
-                'machine learning': "6-8",
-                'computer vision': "5-7",
-                'nlp': "6-8",
-                'neural networks': "4-6",
-
-                // Web Development skill estimates
-                'javascript': "4-6",
-                'react': "3-4",
-                'node.js': "4-5",
-                'python': "4-6",
-                'django': "3-4",
-                'postgresql': "2-3",
-                'aws': "6-8",
-                'docker': "2-3",
-
-                // Cybersecurity skill estimates
-                'networking': "4-6",
-                'penetration testing': "6-8",
-                'malware analysis': "5-7",
-                'cloud security': "4-6",
-                'network security': "5-7",
-                'cryptography': "4-6",
-                'incident response': "3-4",
-                'forensics': "4-6",
-
-                // Data Science skill estimates
-                'statistics': "4-6",
-                'data visualization': "2-3",
-                'sql': "2-3",
-                'r': "4-6",
-                'pandas': "2-3",
-                'numpy': "2-3",
-                'scikit-learn': "3-4",
-                'hadoop': "4-6",
-                'spark': "4-6"
-            };
-            
-            return timeEstimates[skill.toLowerCase()] || "4-6";
-        }
     </script>
 </body>
 </html>
@@ -1459,58 +1397,58 @@ def init_db():
     core_courses = [
         # AI/ML Courses
         ("Deep Learning Specialization", "deep learning", "AI", "Coursera", 
-         "https://www.coursera.org/specializations/deep-learning", "Advanced", "Andrew Ng", "20 weeks", 
+         "https://www.coursera.org/specializations/deep-learning", "Advanced", "Andrew Ng", "5 months", 
          "Comprehensive deep learning curriculum covering neural networks, CNN, RNN", 4.9),
         ("Machine Learning", "machine learning", "AI", "Stanford Online", 
-         "https://www.coursera.org/learn/machine-learning", "Intermediate", "Andrew Ng", "12 weeks", 
+         "https://www.coursera.org/learn/machine-learning", "Intermediate", "Andrew Ng", "3 months", 
          "Fundamental machine learning concepts and algorithms", 4.8),
         ("Computer Vision A-Z", "computer vision", "AI", "Udemy", 
-         "https://www.udemy.com/course/computer-vision-a-z/", "Advanced", "Various Experts", "16 weeks", 
+         "https://www.udemy.com/course/computer-vision-a-z/", "Advanced", "Various Experts", "4 months", 
          "Complete computer vision toolkit with practical projects", 4.7),
         ("Natural Language Processing Specialization", "nlp", "AI", "Coursera", 
-         "https://www.coursera.org/specializations/natural-language-processing", "Advanced", "DeepLearning.AI", "16 weeks", 
+         "https://www.coursera.org/specializations/natural-language-processing", "Advanced", "DeepLearning.AI", "4 months", 
          "Advanced NLP techniques and transformers", 4.8),
         
         # Web Development Courses
         ("The Complete Web Development Bootcamp", "web development", "Web Development", "Udemy", 
-         "https://www.udemy.com/course/the-complete-web-development-bootcamp/", "Beginner", "Dr. Angela Yu", "24 weeks", 
+         "https://www.udemy.com/course/the-complete-web-development-bootcamp/", "Beginner", "Dr. Angela Yu", "6 months", 
          "Complete web development from frontend to backend", 4.8),
         ("React - The Complete Guide", "react", "Web Development", "Udemy", 
-         "https://www.udemy.com/course/react-the-complete-guide-incl-redux/", "Intermediate", "Maximilian Schwarzmüller", "8 weeks", 
+         "https://www.udemy.com/course/react-the-complete-guide-incl-redux/", "Intermediate", "Maximilian Schwarzmüller", "2 months", 
          "Modern React with Hooks and Redux", 4.9),
         ("Complete Node.js Developer", "node.js", "Web Development", "Zero To Mastery", 
-         "https://academy.zerotomastery.io/p/learn-node-js", "Intermediate", "Andrei Neagoie", "12 weeks", 
+         "https://academy.zerotomastery.io/p/learn-node-js", "Intermediate", "Andrei Neagoie", "3 months", 
          "Backend development with Node.js and Express", 4.8),
         ("AWS Certified Developer Associate", "aws", "Web Development", "A Cloud Guru", 
-         "https://acloudguru.com/course/aws-certified-developer-associate", "Advanced", "Ryan Kroonenburg", "16 weeks", 
+         "https://acloudguru.com/course/aws-certified-developer-associate", "Advanced", "Ryan Kroonenburg", "4 months", 
          "Cloud development and deployment with AWS", 4.7),
         
         # Cybersecurity Courses
         ("Penetration Testing Professional", "penetration testing", "Cybersecurity", "INE Security", 
-         "https://ine.com/learning/paths/penetration-testing-professional", "Advanced", "Security Experts", "12 weeks", 
+         "https://ine.com/learning/paths/penetration-testing-professional", "Advanced", "Security Experts", "3 months", 
          "Hands-on penetration testing and ethical hacking", 4.9),
         ("CompTIA Security+ Certification", "network security", "Cybersecurity", "CompTIA", 
-         "https://www.comptia.org/certifications/security", "Intermediate", "Various Experts", "8 weeks", 
+         "https://www.comptia.org/certifications/security", "Intermediate", "Various Experts", "2 months", 
          "Fundamental security concepts and implementation", 4.8),
         ("AWS Security Specialty", "cloud security", "Cybersecurity", "A Cloud Guru", 
-         "https://acloudguru.com/course/aws-certified-security-specialty", "Advanced", "Cloud Experts", "12 weeks", 
+         "https://acloudguru.com/course/aws-certified-security-specialty", "Advanced", "Cloud Experts", "3 months", 
          "Security in AWS cloud environments", 4.7),
         ("SANS SEC504: Incident Handling", "incident response", "Cybersecurity", "SANS Institute", 
-         "https://www.sans.org/cyber-security-courses/hacker-techniques-incident-handling/", "Advanced", "SANS Instructors", "8 weeks", 
+         "https://www.sans.org/cyber-security-courses/hacker-techniques-incident-handling/", "Advanced", "SANS Instructors", "2 months", 
          "Advanced incident response and threat hunting", 4.9),
         
         # Data Science Courses
         ("Data Scientist Professional with Python", "data science", "Data Science", "DataCamp", 
-         "https://www.datacamp.com/tracks/data-scientist-professional-with-python", "Intermediate", "Various Experts", "16 weeks", 
+         "https://www.datacamp.com/tracks/data-scientist-professional-with-python", "Intermediate", "Various Experts", "4 months", 
          "Comprehensive data science curriculum with real-world projects", 4.8),
         ("Applied Data Science with Python Specialization", "python", "Data Science", "Coursera", 
-         "https://www.coursera.org/specializations/data-science-python", "Intermediate", "University of Michigan", "12 weeks", 
+         "https://www.coursera.org/specializations/data-science-python", "Intermediate", "University of Michigan", "3 months", 
          "Practical data science using Python libraries", 4.7),
         ("Big Data with Apache Spark", "spark", "Data Science", "edX", 
-         "https://www.edx.org/professional-certificate/berkeleyxapache-spark", "Advanced", "Berkeley Professors", "12 weeks", 
+         "https://www.edx.org/professional-certificate/berkeleyxapache-spark", "Advanced", "Berkeley Professors", "3 months", 
          "Large-scale data processing with Spark", 4.8),
         ("Statistical Learning", "statistics", "Data Science", "Stanford Online", 
-         "https://online.stanford.edu/courses/sohs-ystatslearning-statistical-learning", "Advanced", "Trevor Hastie & Rob Tibshirani", "16 weeks", 
+         "https://online.stanford.edu/courses/sohs-ystatslearning-statistical-learning", "Advanced", "Trevor Hastie & Rob Tibshirani", "4 months", 
          "Advanced statistical methods for data science", 4.9)
     ]
     

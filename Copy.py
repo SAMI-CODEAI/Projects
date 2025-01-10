@@ -436,33 +436,11 @@ HTML_TEMPLATE = '''
         }
 
         .price-tag {
-            background: rgba(76, 175, 80, 0.1);  /* Light green background */
-            color: #4CAF50;  /* Green text */
+            background: rgba(255, 193, 7, 0.1);
+            color: #ffc107;
             padding: 4px 12px;
             border-radius: 15px;
             font-size: 0.9em;
-            font-weight: 600;
-            display: inline-block;
-            margin: 5px 0;
-        }
-
-        .price-tag.free {
-            background: rgba(76, 175, 80, 0.2);  /* Slightly darker green background */
-            color: #4CAF50;  /* Green text */
-            border: 1px solid rgba(76, 175, 80, 0.3);  /* Subtle border */
-            animation: pulse 2s infinite;  /* Add subtle pulse animation */
-        }
-
-        @keyframes pulse {
-            0% {
-                transform: scale(1);
-            }
-            50% {
-                transform: scale(1.05);
-            }
-            100% {
-                transform: scale(1);
-            }
         }
 
         .course-link {
@@ -724,7 +702,6 @@ HTML_TEMPLATE = '''
 
         .site-header {
             display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
             gap: 15px;
@@ -763,73 +740,16 @@ HTML_TEMPLATE = '''
             -webkit-text-fill-color: transparent;
         }
 
+        .title-container {
+            text-align: center;
+        }
+
         .site-subtitle {
-            font-size: 1.2em;
-            color: #4CAF50;
+            color: var(--primary);
             margin: 0;
-            padding: 5px 0;
-            border-radius: 0;
-            background: none;
-            border: none;
-            opacity: 0.9;
-            transition: opacity 0.3s ease;
-        }
-
-        .site-subtitle:hover {
-            opacity: 1;
-        }
-
-        /* Light mode variables */
-        [data-theme="light"] {
-            --primary: #4CAF50;
-            --background: #ffffff;
-            --card-bg: #f5f5f5;
-            --text: #333333;
-            --secondary-text: #666666;
-        }
-
-        /* Dark mode variables (your existing colors) */
-        [data-theme="dark"] {
-            --primary: #4CAF50;
-            --background: #0a0a0a;
-            --card-bg: #1a1a1a;
-            --text: #ffffff;
-            --secondary-text: #a0a0a0;
-        }
-
-        /* Theme toggle button styles */
-        .theme-toggle {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: var(--card-bg);
-            border: 1px solid var(--primary);
-            color: var(--text);
-            padding: 8px;  /* Reduced padding */
-            width: 40px;   /* Fixed width */
-            height: 40px;  /* Fixed height */
-            border-radius: 50%;  /* Make it circular */
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-            transition: all 0.3s ease;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        }
-
-        .theme-toggle:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-        }
-
-        .theme-toggle i {
-            font-size: 1.2em;
-        }
-
-        /* Hide the text, show only the icon */
-        .toggle-text {
-            display: none;
+            font-size: 1em;
+            opacity: 0.8;
+            margin-top: -5px;
         }
     </style>
 </head>
@@ -837,8 +757,10 @@ HTML_TEMPLATE = '''
     <div class="container">
         <div class="site-header">
             <i class="fas fa-brain site-icon"></i>
-            <h1 class="site-title">Career Path Advisor</h1>
-            <h2 class="site-subtitle">Course Recommendations</h2>
+            <div class="title-container">
+                <h1 class="site-title">Career Path Advisor</h1>
+                <p class="site-subtitle">Course Recommendations</p>
+            </div>
         </div>
         
         <div class="form-container">
@@ -882,11 +804,6 @@ HTML_TEMPLATE = '''
             <div id="courses" class="results-container"></div>
         </div>
     </div>
-
-    <button class="theme-toggle" onclick="toggleTheme()">
-        <i class="fas fa-moon"></i>
-        <span class="toggle-text">Dark Mode</span>
-    </button>
 
     <script>
         function submitForm() {
@@ -947,7 +864,7 @@ HTML_TEMPLATE = '''
                                     <div class="step-content">
                                         <div class="step-header">
                                             <h4 class="step-title">${skill}</h4>
-                                            <span class="step-duration">Estimated: ${getSkillDuration(skill)}</span>
+                                            <span class="step-duration">Estimated: ${getSkillTimeEstimate(skill)} weeks</span>
                                         </div>
                                         <p class="step-description">
                                             ${getSkillDescription(skill, data.specialization)}
@@ -1187,43 +1104,58 @@ HTML_TEMPLATE = '''
         }
 
         function displayCourses(courses) {
-            const courseContainer = document.getElementById('courses');
-            courseContainer.innerHTML = '';
+            const courseContainer = document.getElementById('courseContainer');
+            courseContainer.innerHTML = ''; // Clear previous results
             
-            courses.forEach(course => {
-                const courseCard = document.createElement('div');
-                courseCard.className = 'course-card';
+            // Add section header for paid courses
+            if (courses.paid_courses && courses.paid_courses.length > 0) {
+                const paidHeader = document.createElement('h3');
+                paidHeader.textContent = 'Premium Courses';
+                paidHeader.className = 'section-header';
+                courseContainer.appendChild(paidHeader);
                 
-                const priceTag = course.is_paid ? 
-                    `<span class="price-tag">
-                        $${course.price}
-                    </span>` : 
-                    `<span class="price-tag free">
-                        <i class="fas fa-gift"></i> Free
-                    </span>`;
+                // Display paid courses
+                courses.paid_courses.forEach(course => {
+                    const courseCard = createCourseCard(course, true);
+                    courseContainer.appendChild(courseCard);
+                });
+            }
+            
+            // Add section header for free courses
+            if (courses.free_courses && courses.free_courses.length > 0) {
+                const freeHeader = document.createElement('h3');
+                freeHeader.textContent = 'Free Learning Resources';
+                freeHeader.className = 'section-header';
+                courseContainer.appendChild(freeHeader);
                 
-                courseCard.innerHTML = `
-                    <h3>${course.name}</h3>
-                    <div class="course-platform">
-                        <span class="platform-tag">${course.platform}</span>
-                    </div>
-                    <div class="course-stats">
-                        <div class="stat">
-                            <i class="fas fa-star"></i> ${course.rating}/5
-                        </div>
-                        <div class="stat">
-                            <i class="fas fa-clock"></i> ${course.duration}
-                        </div>
-                    </div>
-                    ${priceTag}
-                    <p>${course.description}</p>
-                    <a href="${course.url}" target="_blank" class="course-link">
-                        Learn More →
-                    </a>
-                `;
-                
-                courseContainer.appendChild(courseCard);
-            });
+                // Display free courses
+                courses.free_courses.forEach(course => {
+                    const courseCard = createCourseCard(course, false);
+                    courseContainer.appendChild(courseCard);
+                });
+            }
+        }
+
+        function createCourseCard(course, isPaid) {
+            const card = document.createElement('div');
+            card.className = 'course-card';
+            
+            const title = course.name || course.title;
+            const rating = course.rating ? `${course.rating}/5` : 'Not rated';
+            
+            card.innerHTML = `
+                <h3>${title}</h3>
+                <p><strong>Instructor:</strong> ${course.instructor}</p>
+                <p><strong>Platform:</strong> ${course.platform}</p>
+                <p><strong>Duration:</strong> ${course.duration}</p>
+                <p><strong>Rating:</strong> ${rating}</p>
+                ${isPaid ? `<p><strong>Price:</strong> $${course.price}</p>` : 
+                           `<p><strong>Skill Level:</strong> ${course.skill_level}</p>
+                            <p><a href="${course.url}" target="_blank" class="course-link">Access Course</a></p>`}
+                <p class="course-description">${course.description}</p>
+            `;
+            
+            return card;
         }
 
         function renderLearningResources(resources) {
@@ -1333,53 +1265,6 @@ HTML_TEMPLATE = '''
                    `Master ${skill} to enhance your expertise in ${specialization}. This skill is crucial for professional development in this field.`;
         }
 
-        function getSkillDuration(skill) {
-            const skillDurations = {
-                // AI/ML skill durations
-                'keras': "2-3 weeks",
-                'tensorflow': "4-6 weeks",
-                'pytorch': "4-6 weeks",
-                'deep learning': "12-16 weeks",
-                'machine learning': "8-12 weeks",
-                'computer vision': "6-8 weeks",
-                'nlp': "6-8 weeks",
-                'neural networks': "4-6 weeks",
-                
-                // Web Development skill durations
-                'javascript': "6-8 weeks",
-                'react': "4-6 weeks",
-                'node.js': "4-6 weeks",
-                'python': "6-8 weeks",
-                'django': "3-4 weeks",
-                'postgresql': "2-3 weeks",
-                'aws': "6-8 weeks",
-                'docker': "2-3 weeks",
-                
-                // Cybersecurity skill durations
-                'networking': "4-6 weeks",
-                'penetration testing': "8-12 weeks",
-                'malware analysis': "6-8 weeks",
-                'cloud security': "6-8 weeks",
-                'network security': "6-8 weeks",
-                'cryptography': "4-6 weeks",
-                'incident response': "3-4 weeks",
-                'forensics': "4-6 weeks",
-                
-                // Data Science skill durations
-                'statistics': "6-8 weeks",
-                'data visualization': "2-3 weeks",
-                'sql': "3-4 weeks",
-                'r': "4-6 weeks",
-                'pandas': "2-3 weeks",
-                'numpy': "2-3 weeks",
-                'scikit-learn': "3-4 weeks",
-                'hadoop': "4-6 weeks",
-                'spark': "4-6 weeks"
-            };
-
-            return skillDurations[skill.toLowerCase()] || "4-6 weeks";
-        }
-
         function getSkillResources(skill) {
             return [
                 {
@@ -1397,43 +1282,52 @@ HTML_TEMPLATE = '''
             ];
         }
 
-        // Theme toggle functionality
-        function toggleTheme() {
-            const body = document.body;
-            const toggleBtn = document.querySelector('.theme-toggle');
-            const toggleIcon = toggleBtn.querySelector('i');
-            const toggleText = toggleBtn.querySelector('.toggle-text');
-            
-            if (body.getAttribute('data-theme') === 'light') {
-                body.setAttribute('data-theme', 'dark');
-                toggleIcon.className = 'fas fa-sun';
-                toggleText.textContent = 'Light Mode';
-                localStorage.setItem('theme', 'dark');
-            } else {
-                body.setAttribute('data-theme', 'light');
-                toggleIcon.className = 'fas fa-moon';
-                toggleText.textContent = 'Dark Mode';
-                localStorage.setItem('theme', 'light');
-            }
-        }
+        function getSkillTimeEstimate(skill) {
+            const timeEstimates = {
+                // AI/ML skill estimates
+                'keras': "2-3",
+                'tensorflow': "4-6",
+                'pytorch': "3-4",
+                'deep learning': "8-12",
+                'machine learning': "6-8",
+                'computer vision': "5-7",
+                'nlp': "6-8",
+                'neural networks': "4-6",
 
-        // Set initial theme based on user's preference
-        document.addEventListener('DOMContentLoaded', () => {
-            const savedTheme = localStorage.getItem('theme') || 'dark';
-            const body = document.body;
-            const toggleBtn = document.querySelector('.theme-toggle');
-            const toggleIcon = toggleBtn.querySelector('i');
-            const toggleText = toggleBtn.querySelector('.toggle-text');
+                // Web Development skill estimates
+                'javascript': "4-6",
+                'react': "3-4",
+                'node.js': "4-5",
+                'python': "4-6",
+                'django': "3-4",
+                'postgresql': "2-3",
+                'aws': "6-8",
+                'docker': "2-3",
+
+                // Cybersecurity skill estimates
+                'networking': "4-6",
+                'penetration testing': "6-8",
+                'malware analysis': "5-7",
+                'cloud security': "4-6",
+                'network security': "5-7",
+                'cryptography': "4-6",
+                'incident response': "3-4",
+                'forensics': "4-6",
+
+                // Data Science skill estimates
+                'statistics': "4-6",
+                'data visualization': "2-3",
+                'sql': "2-3",
+                'r': "4-6",
+                'pandas': "2-3",
+                'numpy': "2-3",
+                'scikit-learn': "3-4",
+                'hadoop': "4-6",
+                'spark': "4-6"
+            };
             
-            body.setAttribute('data-theme', savedTheme);
-            if (savedTheme === 'light') {
-                toggleIcon.className = 'fas fa-moon';
-                toggleText.textContent = 'Dark Mode';
-            } else {
-                toggleIcon.className = 'fas fa-sun';
-                toggleText.textContent = 'Light Mode';
-            }
-        });
+            return timeEstimates[skill.toLowerCase()] || "4-6";
+        }
     </script>
 </body>
 </html>
@@ -1565,58 +1459,58 @@ def init_db():
     core_courses = [
         # AI/ML Courses
         ("Deep Learning Specialization", "deep learning", "AI", "Coursera", 
-         "https://www.coursera.org/specializations/deep-learning", "Advanced", "Andrew Ng", "5 months", 
+         "https://www.coursera.org/specializations/deep-learning", "Advanced", "Andrew Ng", "20 weeks", 
          "Comprehensive deep learning curriculum covering neural networks, CNN, RNN", 4.9),
         ("Machine Learning", "machine learning", "AI", "Stanford Online", 
-         "https://www.coursera.org/learn/machine-learning", "Intermediate", "Andrew Ng", "3 months", 
+         "https://www.coursera.org/learn/machine-learning", "Intermediate", "Andrew Ng", "12 weeks", 
          "Fundamental machine learning concepts and algorithms", 4.8),
         ("Computer Vision A-Z", "computer vision", "AI", "Udemy", 
-         "https://www.udemy.com/course/computer-vision-a-z/", "Advanced", "Various Experts", "4 months", 
+         "https://www.udemy.com/course/computer-vision-a-z/", "Advanced", "Various Experts", "16 weeks", 
          "Complete computer vision toolkit with practical projects", 4.7),
         ("Natural Language Processing Specialization", "nlp", "AI", "Coursera", 
-         "https://www.coursera.org/specializations/natural-language-processing", "Advanced", "DeepLearning.AI", "4 months", 
+         "https://www.coursera.org/specializations/natural-language-processing", "Advanced", "DeepLearning.AI", "16 weeks", 
          "Advanced NLP techniques and transformers", 4.8),
         
         # Web Development Courses
         ("The Complete Web Development Bootcamp", "web development", "Web Development", "Udemy", 
-         "https://www.udemy.com/course/the-complete-web-development-bootcamp/", "Beginner", "Dr. Angela Yu", "6 months", 
+         "https://www.udemy.com/course/the-complete-web-development-bootcamp/", "Beginner", "Dr. Angela Yu", "24 weeks", 
          "Complete web development from frontend to backend", 4.8),
         ("React - The Complete Guide", "react", "Web Development", "Udemy", 
-         "https://www.udemy.com/course/react-the-complete-guide-incl-redux/", "Intermediate", "Maximilian Schwarzmüller", "2 months", 
+         "https://www.udemy.com/course/react-the-complete-guide-incl-redux/", "Intermediate", "Maximilian Schwarzmüller", "8 weeks", 
          "Modern React with Hooks and Redux", 4.9),
         ("Complete Node.js Developer", "node.js", "Web Development", "Zero To Mastery", 
-         "https://academy.zerotomastery.io/p/learn-node-js", "Intermediate", "Andrei Neagoie", "3 months", 
+         "https://academy.zerotomastery.io/p/learn-node-js", "Intermediate", "Andrei Neagoie", "12 weeks", 
          "Backend development with Node.js and Express", 4.8),
         ("AWS Certified Developer Associate", "aws", "Web Development", "A Cloud Guru", 
-         "https://acloudguru.com/course/aws-certified-developer-associate", "Advanced", "Ryan Kroonenburg", "4 months", 
+         "https://acloudguru.com/course/aws-certified-developer-associate", "Advanced", "Ryan Kroonenburg", "16 weeks", 
          "Cloud development and deployment with AWS", 4.7),
         
         # Cybersecurity Courses
         ("Penetration Testing Professional", "penetration testing", "Cybersecurity", "INE Security", 
-         "https://ine.com/learning/paths/penetration-testing-professional", "Advanced", "Security Experts", "3 months", 
+         "https://ine.com/learning/paths/penetration-testing-professional", "Advanced", "Security Experts", "12 weeks", 
          "Hands-on penetration testing and ethical hacking", 4.9),
         ("CompTIA Security+ Certification", "network security", "Cybersecurity", "CompTIA", 
-         "https://www.comptia.org/certifications/security", "Intermediate", "Various Experts", "2 months", 
+         "https://www.comptia.org/certifications/security", "Intermediate", "Various Experts", "8 weeks", 
          "Fundamental security concepts and implementation", 4.8),
         ("AWS Security Specialty", "cloud security", "Cybersecurity", "A Cloud Guru", 
-         "https://acloudguru.com/course/aws-certified-security-specialty", "Advanced", "Cloud Experts", "3 months", 
+         "https://acloudguru.com/course/aws-certified-security-specialty", "Advanced", "Cloud Experts", "12 weeks", 
          "Security in AWS cloud environments", 4.7),
         ("SANS SEC504: Incident Handling", "incident response", "Cybersecurity", "SANS Institute", 
-         "https://www.sans.org/cyber-security-courses/hacker-techniques-incident-handling/", "Advanced", "SANS Instructors", "2 months", 
+         "https://www.sans.org/cyber-security-courses/hacker-techniques-incident-handling/", "Advanced", "SANS Instructors", "8 weeks", 
          "Advanced incident response and threat hunting", 4.9),
         
         # Data Science Courses
         ("Data Scientist Professional with Python", "data science", "Data Science", "DataCamp", 
-         "https://www.datacamp.com/tracks/data-scientist-professional-with-python", "Intermediate", "Various Experts", "4 months", 
+         "https://www.datacamp.com/tracks/data-scientist-professional-with-python", "Intermediate", "Various Experts", "16 weeks", 
          "Comprehensive data science curriculum with real-world projects", 4.8),
         ("Applied Data Science with Python Specialization", "python", "Data Science", "Coursera", 
-         "https://www.coursera.org/specializations/data-science-python", "Intermediate", "University of Michigan", "3 months", 
+         "https://www.coursera.org/specializations/data-science-python", "Intermediate", "University of Michigan", "12 weeks", 
          "Practical data science using Python libraries", 4.7),
         ("Big Data with Apache Spark", "spark", "Data Science", "edX", 
-         "https://www.edx.org/professional-certificate/berkeleyxapache-spark", "Advanced", "Berkeley Professors", "3 months", 
+         "https://www.edx.org/professional-certificate/berkeleyxapache-spark", "Advanced", "Berkeley Professors", "12 weeks", 
          "Large-scale data processing with Spark", 4.8),
         ("Statistical Learning", "statistics", "Data Science", "Stanford Online", 
-         "https://online.stanford.edu/courses/sohs-ystatslearning-statistical-learning", "Advanced", "Trevor Hastie & Rob Tibshirani", "4 months", 
+         "https://online.stanford.edu/courses/sohs-ystatslearning-statistical-learning", "Advanced", "Trevor Hastie & Rob Tibshirani", "16 weeks", 
          "Advanced statistical methods for data science", 4.9)
     ]
     
@@ -1696,16 +1590,9 @@ def suggest():
         "instructor": course[5],
         "duration": course[6],
         "description": course[7],
-        "rating": course[8],
-        "is_paid": False,
-        "price": 49  # Simple dollar price if paid
+        "rating": course[8]
     } for course in courses]
-
-    # Make some courses paid
-    for i, course in enumerate(course_recommendations):
-        if i % 2 == 0:  # Make every other course paid
-            course["is_paid"] = True
-
+    
     conn.close()
 
     return jsonify({
