@@ -4,6 +4,15 @@ from flask import Flask, request, jsonify, render_template_string
 app = Flask(__name__)
 DATABASE = 'course_recommendations.db'
 
+# Add these routes at the top of the file, after the app initialization
+@app.route('/')
+def index():
+    return render_template_string(HTML_TEMPLATE)
+
+@app.route('/home')
+def home():
+    return render_template_string(HTML_TEMPLATE)
+
 # HTML template as a string
 HTML_TEMPLATE = '''
 <!DOCTYPE html>
@@ -560,6 +569,111 @@ HTML_TEMPLATE = '''
         .resource-link:hover {
             background: var(--primary-dark);
         }
+
+        .roadmap-container {
+            background: var(--card-bg);
+            border-radius: 15px;
+            padding: 25px;
+            margin: 20px 0;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .roadmap-step {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 30px;
+            position: relative;
+            padding-left: 50px;
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+
+        .roadmap-step:before {
+            content: '';
+            position: absolute;
+            left: 20px;
+            top: 0;
+            bottom: -30px;
+            width: 2px;
+            background: var(--primary);
+            opacity: 0.3;
+        }
+
+        .roadmap-step:last-child:before {
+            display: none;
+        }
+
+        .step-number {
+            position: absolute;
+            left: 10px;
+            top: 0;
+            width: 24px;
+            height: 24px;
+            background: var(--primary);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 0.8em;
+        }
+
+        .step-content {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 20px;
+            flex-grow: 1;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .step-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+
+        .step-title {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: var(--primary);
+            margin: 0;
+        }
+
+        .step-duration {
+            font-size: 0.9em;
+            color: var(--secondary-text);
+            background: rgba(76, 175, 80, 0.1);
+            padding: 4px 12px;
+            border-radius: 15px;
+        }
+
+        .step-description {
+            color: var(--text);
+            margin-bottom: 15px;
+            line-height: 1.5;
+        }
+
+        .step-resources {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .resource-tag {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text);
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 0.9em;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .resource-tag i {
+            color: var(--primary);
+        }
     </style>
 </head>
 <body>
@@ -644,29 +758,42 @@ HTML_TEMPLATE = '''
                 // Display missing skills
                 if (data.missing_skills.length === 0) {
                     flowchart.innerHTML = `
-                        <div class="step fade-in">
-                            <h4>Excellent Profile!</h4>
-                            <p>You have all the core skills for this specialization.</p>
+                        <div class="roadmap-container">
+                            <div class="roadmap-step">
+                                <div class="step-number">✓</div>
+                                <div class="step-content">
+                                    <div class="step-header">
+                                        <h4 class="step-title">Excellent Profile!</h4>
+                                        <span class="step-duration">Ready to Go</span>
+                                    </div>
+                                    <p class="step-description">You have all the core skills for this specialization.</p>
+                                </div>
+                            </div>
                         </div>
                     `;
                 } else {
-                    data.missing_skills.forEach((skill, index) => {
-                        const step = document.createElement("div");
-                        step.className = "step fade-in";
-                        step.style.animationDelay = `${index * 0.1}s`;
-                        step.innerHTML = `
-                            <h4>${skill}</h4>
-                            <div class="progress-bar">
-                                <div class="progress-fill" style="width: 0%"></div>
+                    flowchart.innerHTML = `
+                        <div class="roadmap-container">
+                            <div class="roadmap-header">
+                                <h3>Your Learning Journey</h3>
+                                <p>Master these skills to advance in your career</p>
                             </div>
-                        `;
-                        flowchart.appendChild(step);
-                        
-                        // Animate progress bar
-                        setTimeout(() => {
-                            step.querySelector('.progress-fill').style.width = '100%';
-                        }, 100);
-                    });
+                            ${data.missing_skills.map((skill, index) => `
+                                <div class="roadmap-step" style="animation-delay: ${index * 0.1}s">
+                                    <div class="step-number">${index + 1}</div>
+                                    <div class="step-content">
+                                        <div class="step-header">
+                                            <h4 class="step-title">${skill}</h4>
+                                            <span class="step-duration">Estimated: 4-6 weeks</span>
+                                        </div>
+                                        <p class="step-description">
+                                            ${getSkillDescription(skill, data.specialization)}
+                                        </p>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
                 }
 
                 // Display profile comparisons
@@ -1009,6 +1136,71 @@ HTML_TEMPLATE = '''
                 });
             });
         });
+
+        function getSkillDescription(skill, specialization) {
+            const skillDescriptions = {
+                // AI/ML skill descriptions
+                'keras': "A powerful deep learning framework essential for building and training neural networks quickly. Used extensively in AI for rapid prototyping and research.",
+                'tensorflow': "Google's flagship deep learning framework, crucial for developing and deploying large-scale machine learning models in production AI systems.",
+                'pytorch': "Facebook's dynamic deep learning framework, preferred in AI research for its flexibility and debugging capabilities.",
+                'deep learning': "Core technology behind modern AI, enabling machines to learn from examples and recognize complex patterns in data.",
+                'machine learning': "Fundamental AI technology that allows systems to learn from data and make intelligent decisions without explicit programming.",
+                'computer vision': "Essential AI field for processing and analyzing visual data, enabling applications like facial recognition and autonomous vehicles.",
+                'nlp': "Natural Language Processing is key to AI applications that understand, interpret, and generate human language.",
+                'neural networks': "Foundational structures in AI that mimic human brain function, crucial for deep learning applications.",
+                
+                // Web Development skill descriptions
+                'javascript': "Core programming language for web development, essential for creating interactive and dynamic web applications.",
+                'react': "Popular JavaScript library for building user interfaces, crucial for modern web application development.",
+                'node.js': "Server-side JavaScript runtime, enabling full-stack JavaScript development and scalable web applications.",
+                'python': "Versatile programming language used in web backends, offering extensive libraries and frameworks.",
+                'django': "Robust Python web framework for building secure and maintainable web applications quickly.",
+                'postgresql': "Advanced open-source database system for storing and managing application data reliably.",
+                'aws': "Leading cloud platform providing essential services for modern web application deployment and scaling.",
+                'docker': "Containerization technology crucial for consistent development and deployment environments.",
+                
+                // Cybersecurity skill descriptions
+                'networking': "Fundamental knowledge for understanding and securing computer networks and communication systems.",
+                'penetration testing': "Essential security skill for identifying and fixing vulnerabilities before they can be exploited.",
+                'malware analysis': "Critical capability for understanding and defending against malicious software threats.",
+                'cloud security': "Vital expertise for protecting cloud-based systems and data in modern infrastructure.",
+                'network security': "Core competency for protecting computer networks from unauthorized access and attacks.",
+                'cryptography': "Essential science of securing communication and data through encryption techniques.",
+                'incident response': "Crucial skill for effectively handling and recovering from security breaches.",
+                'forensics': "Important capability for investigating security incidents and collecting digital evidence.",
+                
+                // Data Science skill descriptions
+                'statistics': "Fundamental knowledge for analyzing data and drawing meaningful conclusions.",
+                'data visualization': "Essential skill for communicating insights and patterns found in complex datasets.",
+                'sql': "Critical language for managing and querying structured databases in data analysis.",
+                'r': "Powerful programming language specialized for statistical computing and graphics.",
+                'pandas': "Essential Python library for data manipulation and analysis.",
+                'numpy': "Fundamental package for scientific computing with Python.",
+                'scikit-learn': "Core machine learning library for data science in Python.",
+                'hadoop': "Framework for distributed storage and processing of big data.",
+                'spark': "Fast and general-purpose cluster computing system for big data processing."
+            };
+
+            return skillDescriptions[skill.toLowerCase()] || 
+                   `Master ${skill} to enhance your expertise in ${specialization}. This skill is crucial for professional development in this field.`;
+        }
+
+        function getSkillResources(skill) {
+            return [
+                {
+                    icon: 'fas fa-book',
+                    text: 'Learning Resources'
+                },
+                {
+                    icon: 'fas fa-laptop-code',
+                    text: 'Hands-on Practice'
+                },
+                {
+                    icon: 'fas fa-project-diagram',
+                    text: 'Real Projects'
+                }
+            ];
+        }
     </script>
 </body>
 </html>
@@ -1019,136 +1211,181 @@ def init_db():
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
     
-    # Create tables (existing structure)
+    # Create tables with proper schema
+    cursor.execute('''
+    DROP TABLE IF EXISTS users
+    ''')
     
-    # Enhanced professional profiles with diverse backgrounds
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        skills TEXT NOT NULL,
+        specialization TEXT NOT NULL,
+        experience_years INTEGER NOT NULL,
+        company TEXT NOT NULL
+    )
+    ''')
+    
+    # Expanded profiles per specialization
     sample_professionals = [
-        # AI/ML Expert
+        # AI/ML Professionals
         ("Sarah Chen", 
-         "python,tensorflow,pytorch,deep learning,machine learning,computer vision,nlp,data science,aws",
-         "AI", 7, "Google Brain",
-         "Led AI research team, Published in top conferences, Developed production ML systems",
-         "Deep Learning, Computer Vision, NLP",
-         "Google AI Professional, Stanford ML Specialization, AWS ML Certification"),
+         "python,tensorflow,pytorch,deep learning,machine learning,computer vision,nlp",
+         "AI", 7, "Google Brain"),
+        ("Alex Kumar",
+         "python,keras,scikit-learn,deep learning,data science,reinforcement learning",
+         "AI", 5, "DeepMind"),
+        ("Maria Santos",
+         "python,machine learning,neural networks,computer vision,data mining,statistics",
+         "AI", 9, "OpenAI"),
+        ("John Smith",
+         "python,natural language processing,bert,transformers,machine learning,data analysis",
+         "AI", 6, "Microsoft AI"),
+        ("Emily Zhang",
+         "python,computer vision,object detection,gan,deep learning,pytorch",
+         "AI", 8, "Tesla AI"),
         
-        # Full Stack Developer
+        # Web Development Professionals
         ("Michael Rodriguez", 
-         "javascript,react,node.js,python,django,postgresql,aws,docker,kubernetes,typescript",
-         "Web Development", 8, "Netflix",
-         "Led frontend architecture, Built scalable microservices, Mentored junior developers",
-         "Frontend Architecture, Cloud Infrastructure, DevOps",
-         "AWS Solutions Architect, MongoDB Professional, Kubernetes Admin"),
+         "javascript,react,node.js,python,django,postgresql,aws,docker",
+         "Web Development", 8, "Netflix"),
+        ("Jennifer Park",
+         "javascript,vue.js,php,mysql,html5,css3,typescript,graphql",
+         "Web Development", 6, "Shopify"),
+        ("David Wilson",
+         "javascript,angular,java,spring,mongodb,kubernetes,ci/cd,aws",
+         "Web Development", 10, "Amazon"),
+        ("Sophie Turner",
+         "javascript,react native,mobile development,redux,firebase,aws",
+         "Web Development", 5, "Uber"),
+        ("Carlos Garcia",
+         "python,django,fastapi,postgresql,redis,docker,kubernetes",
+         "Web Development", 7, "Twitter"),
         
-        # Cybersecurity Expert
+        # Cybersecurity Professionals
         ("Emma Thompson", 
-         "python,networking,penetration testing,malware analysis,cloud security,incident response",
-         "Cybersecurity", 6, "Microsoft Security",
-         "Security research, Vulnerability assessment, Threat detection systems",
-         "Threat Analysis, Network Security, Cloud Security",
-         "CISSP, CEH, OSCP, AWS Security Specialist"),
+         "python,networking,penetration testing,malware analysis,cloud security",
+         "Cybersecurity", 6, "Microsoft Security"),
+        ("James Chen",
+         "network security,cryptography,incident response,forensics,security+",
+         "Cybersecurity", 8, "FireEye"),
+        ("Lisa Anderson",
+         "ethical hacking,osint,vulnerability assessment,threat hunting,cissp",
+         "Cybersecurity", 7, "CrowdStrike"),
+        ("Marcus Johnson",
+         "cloud security,aws security,azure security,devsecops,security architecture",
+         "Cybersecurity", 9, "Palo Alto Networks"),
+        ("Sophia Patel",
+         "application security,web security,penetration testing,owasp,secure coding",
+         "Cybersecurity", 5, "Google Security"),
+        
+        # Data Science Professionals
+        ("Daniel Lee",
+         "python,r,statistics,machine learning,data visualization,sql",
+         "Data Science", 7, "Facebook"),
+        ("Rachel Green",
+         "python,pandas,numpy,scikit-learn,tableau,big data",
+         "Data Science", 5, "LinkedIn"),
+        ("Thomas Anderson",
+         "python,spark,hadoop,data engineering,etl,aws",
+         "Data Science", 8, "Airbnb"),
+        ("Anna Martinez",
+         "r,statistics,hypothesis testing,ab testing,experimental design",
+         "Data Science", 6, "Netflix"),
+        ("Kevin Zhang",
+         "python,deep learning,nlp,computer vision,data science,keras",
+         "Data Science", 9, "Apple")
     ]
     
-    # Enhanced courses with detailed information
+    # Insert professionals
+    cursor.executemany(
+        "INSERT INTO users (name, skills, specialization, experience_years, company) VALUES (?, ?, ?, ?, ?)",
+        sample_professionals
+    )
+    
+    # Verify the insertion
+    cursor.execute("SELECT COUNT(*) FROM users")
+    print(f"Inserted {cursor.fetchone()[0]} professionals")
+    
+    # Create and populate courses table
+    cursor.execute('''
+    DROP TABLE IF EXISTS courses
+    ''')
+    
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS courses (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        skill TEXT NOT NULL,
+        specialization TEXT NOT NULL,
+        platform TEXT NOT NULL,
+        url TEXT NOT NULL,
+        difficulty TEXT NOT NULL,
+        instructor TEXT NOT NULL,
+        duration TEXT NOT NULL,
+        description TEXT NOT NULL,
+        rating REAL NOT NULL
+    )
+    ''')
+    
     core_courses = [
         # AI/ML Courses
         ("Deep Learning Specialization", "deep learning", "AI", "Coursera", 
-         "https://coursera.org/deep-learning", "Advanced", "Andrew Ng", "5 months", 
-         "Comprehensive deep learning curriculum covering neural networks, CNN, RNN, and more", 4.9),
-        
-        ("Computer Vision Nanodegree", "computer vision", "AI", "Udacity", 
-         "https://udacity.com/cv", "Advanced", "Industry Experts", "4 months", 
-         "Learn to build computer vision systems with deep learning", 4.8),
-        
-        ("Natural Language Processing", "nlp", "AI", "Stanford Online", 
-         "https://stanford.edu/nlp", "Advanced", "Christopher Manning", "3 months", 
-         "Advanced NLP concepts and implementations", 4.9),
+         "https://www.coursera.org/specializations/deep-learning", "Advanced", "Andrew Ng", "5 months", 
+         "Comprehensive deep learning curriculum covering neural networks, CNN, RNN", 4.9),
+        ("Machine Learning", "machine learning", "AI", "Stanford Online", 
+         "https://www.coursera.org/learn/machine-learning", "Intermediate", "Andrew Ng", "3 months", 
+         "Fundamental machine learning concepts and algorithms", 4.8),
+        ("Computer Vision A-Z", "computer vision", "AI", "Udemy", 
+         "https://www.udemy.com/course/computer-vision-a-z/", "Advanced", "Various Experts", "4 months", 
+         "Complete computer vision toolkit with practical projects", 4.7),
+        ("Natural Language Processing Specialization", "nlp", "AI", "Coursera", 
+         "https://www.coursera.org/specializations/natural-language-processing", "Advanced", "DeepLearning.AI", "4 months", 
+         "Advanced NLP techniques and transformers", 4.8),
         
         # Web Development Courses
-        ("Full Stack Web Development", "web development", "Web Development", "freeCodeCamp", 
-         "https://freecodecamp.org", "Beginner", "Community", "6 months", 
+        ("The Complete Web Development Bootcamp", "web development", "Web Development", "Udemy", 
+         "https://www.udemy.com/course/the-complete-web-development-bootcamp/", "Beginner", "Dr. Angela Yu", "6 months", 
          "Complete web development from frontend to backend", 4.8),
-        
-        ("React and Redux Masterclass", "react", "Web Development", "Udemy", 
-         "https://udemy.com/react-redux", "Intermediate", "Stephen Grider", "2 months", 
-         "Modern React development with Redux and Hooks", 4.7),
-        
-        ("Cloud Native Development", "kubernetes", "Web Development", "Linux Foundation", 
-         "https://linuxfoundation.org/cloud", "Advanced", "Industry Experts", "4 months", 
-         "Learn cloud-native development with Kubernetes", 4.8),
+        ("React - The Complete Guide", "react", "Web Development", "Udemy", 
+         "https://www.udemy.com/course/react-the-complete-guide-incl-redux/", "Intermediate", "Maximilian Schwarzmüller", "2 months", 
+         "Modern React with Hooks and Redux", 4.9),
+        ("Complete Node.js Developer", "node.js", "Web Development", "Zero To Mastery", 
+         "https://academy.zerotomastery.io/p/learn-node-js", "Intermediate", "Andrei Neagoie", "3 months", 
+         "Backend development with Node.js and Express", 4.8),
+        ("AWS Certified Developer Associate", "aws", "Web Development", "A Cloud Guru", 
+         "https://acloudguru.com/course/aws-certified-developer-associate", "Advanced", "Ryan Kroonenburg", "4 months", 
+         "Cloud development and deployment with AWS", 4.7),
         
         # Cybersecurity Courses
-        ("Ethical Hacking", "penetration testing", "Cybersecurity", "Offensive Security", 
-         "https://offensive-security.com", "Advanced", "Security Experts", "3 months", 
+        ("Penetration Testing Professional", "penetration testing", "Cybersecurity", "INE Security", 
+         "https://ine.com/learning/paths/penetration-testing-professional", "Advanced", "Security Experts", "3 months", 
          "Hands-on penetration testing and ethical hacking", 4.9),
+        ("CompTIA Security+ Certification", "network security", "Cybersecurity", "CompTIA", 
+         "https://www.comptia.org/certifications/security", "Intermediate", "Various Experts", "2 months", 
+         "Fundamental security concepts and implementation", 4.8),
+        ("AWS Security Specialty", "cloud security", "Cybersecurity", "A Cloud Guru", 
+         "https://acloudguru.com/course/aws-certified-security-specialty", "Advanced", "Cloud Experts", "3 months", 
+         "Security in AWS cloud environments", 4.7),
+        ("SANS SEC504: Incident Handling", "incident response", "Cybersecurity", "SANS Institute", 
+         "https://www.sans.org/cyber-security-courses/hacker-techniques-incident-handling/", "Advanced", "SANS Instructors", "2 months", 
+         "Advanced incident response and threat hunting", 4.9),
         
-        ("Cloud Security", "cloud security", "Cybersecurity", "Cloud Security Alliance", 
-         "https://cloudsecurityalliance.org", "Intermediate", "Industry Experts", "2 months", 
-         "Comprehensive cloud security and compliance", 4.7),
-        
-        ("Incident Response", "incident response", "Cybersecurity", "SANS Institute", 
-         "https://sans.org/ir", "Advanced", "SANS Instructors", "3 months", 
-         "Advanced incident response and threat hunting", 4.8)
+        # Data Science Courses
+        ("Data Scientist Professional with Python", "data science", "Data Science", "DataCamp", 
+         "https://www.datacamp.com/tracks/data-scientist-professional-with-python", "Intermediate", "Various Experts", "4 months", 
+         "Comprehensive data science curriculum with real-world projects", 4.8),
+        ("Applied Data Science with Python Specialization", "python", "Data Science", "Coursera", 
+         "https://www.coursera.org/specializations/data-science-python", "Intermediate", "University of Michigan", "3 months", 
+         "Practical data science using Python libraries", 4.7),
+        ("Big Data with Apache Spark", "spark", "Data Science", "edX", 
+         "https://www.edx.org/professional-certificate/berkeleyxapache-spark", "Advanced", "Berkeley Professors", "3 months", 
+         "Large-scale data processing with Spark", 4.8),
+        ("Statistical Learning", "statistics", "Data Science", "Stanford Online", 
+         "https://online.stanford.edu/courses/sohs-ystatslearning-statistical-learning", "Advanced", "Trevor Hastie & Rob Tibshirani", "4 months", 
+         "Advanced statistical methods for data science", 4.9)
     ]
-    
-    # Enhanced skill details with comprehensive information
-    skill_details = [
-        # AI/ML Skills
-        ("deep learning", "AI", 
-         "Advanced neural network architectures and applications",
-         "Machine Learning, Python, Mathematics",
-         "Advanced", 160,
-         "1. Neural Networks Fundamentals\n2. CNN Architectures\n3. RNN and LSTM\n4. Transformers\n5. GANs",
-         "Research papers, PyTorch tutorials, Deep Learning courses",
-         "Essential for AI research and advanced ML applications"),
-        
-        ("computer vision", "AI",
-         "Image and video processing using deep learning",
-         "Deep Learning, Python, Linear Algebra",
-         "Advanced", 140,
-         "1. Image Processing\n2. Object Detection\n3. Segmentation\n4. Face Recognition\n5. Video Analysis",
-         "OpenCV, PyTorch Vision, Research papers",
-         "Critical for autonomous systems and visual AI applications"),
-        
-        # Web Development Skills
-        ("react", "Web Development",
-         "Modern frontend development with React ecosystem",
-         "JavaScript, HTML, CSS",
-         "Intermediate", 120,
-         "1. Components and Props\n2. State Management\n3. Hooks\n4. Performance\n5. Testing",
-         "React docs, Redux toolkit, Testing libraries",
-         "Essential for modern web development"),
-        
-        ("kubernetes", "Web Development",
-         "Container orchestration and cloud-native development",
-         "Docker, Linux, Networking",
-         "Advanced", 160,
-         "1. Container Basics\n2. Cluster Management\n3. Deployments\n4. Services\n5. Security",
-         "Kubernetes docs, Cloud tutorials, Practice projects",
-         "Critical for scalable cloud applications"),
-        
-        # Cybersecurity Skills
-        ("penetration testing", "Cybersecurity",
-         "Systematic security testing and vulnerability assessment",
-         "Networking, Linux, Programming",
-         "Advanced", 180,
-         "1. Reconnaissance\n2. Vulnerability Assessment\n3. Exploitation\n4. Post-Exploitation\n5. Reporting",
-         "CTF challenges, Lab practice, Security tools",
-         "Essential for security assessment and hardening"),
-        
-        ("incident response", "Cybersecurity",
-         "Handling and analyzing security incidents",
-         "Network Security, Forensics, System Administration",
-         "Advanced", 140,
-         "1. Incident Detection\n2. Triage\n3. Analysis\n4. Containment\n5. Recovery",
-         "SANS resources, Practice scenarios, Tool mastery",
-         "Critical for security operations and threat response")
-    ]
-    
-    # Insert data into tables
-    cursor.executemany(
-        "INSERT INTO users (name, skills, specialization, experience_years, company) VALUES (?, ?, ?, ?, ?)",
-        [(p[0], p[1], p[2], p[3], p[4]) for p in sample_professionals]
-    )
     
     cursor.executemany("""
         INSERT INTO courses (
@@ -1157,57 +1394,8 @@ def init_db():
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, core_courses)
     
-    cursor.executemany("""
-        INSERT INTO skill_details (
-            skill, specialization, description, prerequisites, difficulty,
-            estimated_hours, learning_path, resources, career_impact
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, skill_details)
-    
     conn.commit()
     conn.close()
-
-# Add route to get learning resources
-@app.route("/learning_resources", methods=["POST"])
-def get_learning_resources():
-    data = request.get_json()
-    skill = data.get("skill", "").lower()
-    
-    conn = sqlite3.connect(DATABASE)
-    cursor = conn.cursor()
-    
-    cursor.execute("""
-        SELECT title, type, platform, url, duration, difficulty, rating,
-               description, instructor, is_free, topics
-        FROM learning_resources
-        WHERE skill = ?
-        ORDER BY rating DESC
-    """, (skill,))
-    
-    resources = [{
-        "title": row[0],
-        "type": row[1],
-        "platform": row[2],
-        "url": row[3],
-        "duration": row[4],
-        "difficulty": row[5],
-        "rating": row[6],
-        "description": row[7],
-        "instructor": row[8],
-        "is_free": row[9],
-        "topics": row[10].split(", ")
-    } for row in cursor.fetchall()]
-    
-    conn.close()
-    
-    return jsonify({
-        "skill": skill,
-        "resources": resources
-    })
-
-@app.route('/')
-def home():
-    return render_template_string(HTML_TEMPLATE)
 
 @app.route("/suggest", methods=["POST"])
 def suggest():
@@ -1219,9 +1407,20 @@ def suggest():
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
     
-    # Get relevant professionals
-    cursor.execute("SELECT name, skills, experience_years, company FROM users WHERE specialization = ?", (specialization,))
+    # Debug: Print the specialization being queried
+    print(f"Querying for specialization: {specialization}")
+    
+    # Get all profiles for the specialization
+    cursor.execute("""
+        SELECT name, skills, experience_years, company 
+        FROM users 
+        WHERE specialization = ?
+    """, (specialization,))
+    
     professionals = cursor.fetchall()
+    
+    # Debug: Print the number of professionals found
+    print(f"Found {len(professionals)} professionals")
     
     profile_comparisons = []
     all_required_skills = set()
@@ -1241,31 +1440,31 @@ def suggest():
             "company": prof[3]
         })
     
+    # Debug: Print the number of profile comparisons
+    print(f"Generated {len(profile_comparisons)} profile comparisons")
+    
     # Get course recommendations
     missing_skills = all_required_skills - user_skills
-    if missing_skills:
-        cursor.execute("""
-            SELECT name, skill, platform, url, difficulty, instructor, duration, description, rating
-            FROM courses 
-            WHERE specialization = ? 
-            ORDER BY rating DESC
-            LIMIT 3
-        """, (specialization,))
-        
-        courses = cursor.fetchall()
-        course_recommendations = [{
-            "name": course[0],
-            "skill": course[1],
-            "platform": course[2],
-            "url": course[3],
-            "difficulty": course[4],
-            "instructor": course[5],
-            "duration": course[6],
-            "description": course[7],
-            "rating": course[8]
-        } for course in courses]
-    else:
-        course_recommendations = []
+    cursor.execute("""
+        SELECT name, skill, platform, url, difficulty, instructor, duration, description, rating
+        FROM courses 
+        WHERE specialization = ? 
+        ORDER BY rating DESC
+        LIMIT 3
+    """, (specialization,))
+    
+    courses = cursor.fetchall()
+    course_recommendations = [{
+        "name": course[0],
+        "skill": course[1],
+        "platform": course[2],
+        "url": course[3],
+        "difficulty": course[4],
+        "instructor": course[5],
+        "duration": course[6],
+        "description": course[7],
+        "rating": course[8]
+    } for course in courses]
     
     conn.close()
 
