@@ -53,6 +53,14 @@ HTML_TEMPLATE = '''
             --secondary-text: #a0a0a0;
         }
         
+        :root[data-theme="light"] {
+            --primary: #4CAF50;
+            --background: #f5f5f5;
+            --card-bg: #ffffff;
+            --text: #333333;
+            --secondary-text: #666666;
+        }
+        
         body {
             background-color: var(--background);
             color: var(--text);
@@ -751,9 +759,42 @@ HTML_TEMPLATE = '''
             opacity: 0.8;
             margin-top: -5px;
         }
+
+        .theme-switcher {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+
+        .theme-switcher button {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: var(--card-bg);
+            border: 2px solid var(--primary);
+            color: var(--primary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2em;
+            transition: all 0.3s ease;
+        }
+
+        .theme-switcher button:hover {
+            transform: rotate(180deg);
+            background: var(--primary);
+            color: white;
+        }
     </style>
 </head>
 <body>
+    <div class="theme-switcher">
+        <button id="themeToggle" onclick="toggleTheme()">
+            <i class="fas fa-sun"></i>
+        </button>
+    </div>
     <div class="container">
         <div class="site-header">
             <i class="fas fa-brain site-icon"></i>
@@ -1327,6 +1368,20 @@ HTML_TEMPLATE = '''
             };
             
             return timeEstimates[skill.toLowerCase()] || "4-6";
+        }
+
+        function toggleTheme() {
+            const root = document.documentElement;
+            const themeButton = document.getElementById('themeToggle');
+            const icon = themeButton.querySelector('i');
+            
+            if (root.getAttribute('data-theme') === 'light') {
+                root.removeAttribute('data-theme');
+                icon.className = 'fas fa-sun';
+            } else {
+                root.setAttribute('data-theme', 'light');
+                icon.className = 'fas fa-moon';
+            }
         }
     </script>
 </body>
