@@ -1,5 +1,9 @@
 import sqlite3
 from flask import Flask, request, jsonify, render_template_string
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+import pandas as pd
+import numpy as np
 
 app = Flask(__name__)
 DATABASE = 'course_recommendations.db'
@@ -12,6 +16,76 @@ def index():
 @app.route('/home')
 def home():
     return render_template_string(HTML_TEMPLATE)
+
+def get_similar_courses(course_name, df, n=3):
+    """Find similar courses based on course description and skills"""
+    # Combine description and skills for better matching
+    df['combined_features'] = df['description'] + ' ' + df['skills']
+    
+    # Create TF-IDF matrix
+    tfidf = TfidfVectorizer(stop_words='english')
+    tfidf_matrix = tfidf.fit_transform(df['combined_features'])
+    
+    # Calculate similarity scores
+    cosine_sim = cosine_similarity(tfidf_matrix)
+    
+    # Get index of selected course
+    idx = df[df['name'] == course_name].index[0]
+    
+    # Get similarity scores for the course
+    sim_scores = list(enumerate(cosine_sim[idx]))
+    sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
+    
+    # Get top N most similar courses (excluding itself)
+    similar_courses = sim_scores[1:n+1]
+    
+    return [
+        {
+            'name': df.iloc[i[0]]['name'],
+            'similarity': round(i[1] * 100, 1),
+            'platform': df.iloc[i[0]]['platform'],
+            'instructor': df.iloc[i[0]]['instructor'],
+            'rating': df.iloc[i[0]]['rating'],
+            'url': df.iloc[i[0]]['url']
+        }
+        for i in similar_courses
+    ]
+
+@app.route("/similar_courses", methods=["POST"])
+def find_similar_courses():
+    """Endpoint to find similar courses"""
+    data = request.get_json()
+    course_name = data.get("course_name")
+    
+    conn = sqlite3.connect(DATABASE)
+    df = pd.read_sql_query("SELECT * FROM courses", conn)
+    conn.close()
+    
+    similar_courses = get_similar_courses(course_name, df)
+    return jsonify({"similar_courses": similar_courses})
+
+# Update the suggest route to include skill filtering
+@app.route("/suggest", methods=["POST"])
+def suggest():
+    """Provide skill suggestions and profile comparisons with skill filtering."""
+    data = request.get_json()
+    user_skills = set(skill.strip().lower() for skill in data.get("skills", "").split(","))
+    specialization = data.get("specialization")
+
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    df = pd.read_sql_query("SELECT * FROM courses", conn)
+    
+    # Filter courses by skills
+    relevant_courses = df[
+        df['skill'].str.lower().isin([s.lower() for s in user_skills]) |
+        df['specialization'].str.lower() == specialization.lower()
+    ]
+    
+    # Get course recommendations based on skill match
+    course_recommendations = relevant_courses.sort_values('rating', ascending=False).head(3).to_dict('records')
+    
+    # ... rest of your existing suggest route code ...
 
 # HTML template as a string
 HTML_TEMPLATE = '''
@@ -51,6 +125,14 @@ HTML_TEMPLATE = '''
             --card-bg: #1a1a1a;
             --text: #ffffff;
             --secondary-text: #a0a0a0;
+        }
+        
+        :root[data-theme="light"] {
+            --primary: #4CAF50;
+            --background: #f5f5f5;
+            --card-bg: #ffffff;
+            --text: #333333;
+            --secondary-text: #666666;
         }
         
         body {
@@ -751,9 +833,42 @@ HTML_TEMPLATE = '''
             opacity: 0.8;
             margin-top: -5px;
         }
+
+        .theme-switcher {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+
+        .theme-switcher button {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: var(--card-bg);
+            border: 2px solid var(--primary);
+            color: var(--primary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2em;
+            transition: all 0.3s ease;
+        }
+
+        .theme-switcher button:hover {
+            transform: rotate(180deg);
+            background: var(--primary);
+            color: white;
+        }
     </style>
 </head>
 <body>
+    <div class="theme-switcher">
+        <button id="themeToggle" onclick="toggleTheme()">
+            <i class="fas fa-sun"></i>
+        </button>
+    </div>
     <div class="container">
         <div class="site-header">
             <i class="fas fa-brain site-icon"></i>
@@ -1328,6 +1443,63 @@ HTML_TEMPLATE = '''
             
             return timeEstimates[skill.toLowerCase()] || "4-6";
         }
+
+        function toggleTheme() {
+            const root = document.documentElement;
+            const themeButton = document.getElementById('themeToggle');
+            const icon = themeButton.querySelector('i');
+            
+            if (root.getAttribute('data-theme') === 'light') {
+                root.removeAttribute('data-theme');
+                icon.className = 'fas fa-sun';
+            } else {
+                root.setAttribute('data-theme', 'light');
+                icon.className = 'fas fa-moon';
+            }
+        }
+
+        // Add to your existing JavaScript
+        function showSimilarCourses(courseName) {
+            fetch('/similar_courses', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    course_name: courseName
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                const similarCoursesContainer = document.getElementById('similar-courses');
+                similarCoursesContainer.innerHTML = `
+                    <div class="section-title">Similar Courses</div>
+                    <div class="results-container">
+                        ${data.similar_courses.map(course => `
+                            <div class="course-card fade-in">
+                                <h4>${course.name}</h4>
+                                <div class="course-platform">
+                                    <span class="platform-tag">${course.platform}</span>
+                                </div>
+                                <div class="course-stats">
+                                    <div class="stat">
+                                        <i class="fas fa-star"></i>
+                                        ${course.rating} Rating
+                                    </div>
+                                    <div class="stat">
+                                        <i class="fas fa-percentage"></i>
+                                        ${course.similarity}% Similar
+                                    </div>
+                                </div>
+                                <a href="${course.url}" target="_blank" class="course-link">
+                                    Learn More →
+                                </a>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            });
+        }
     </script>
 </body>
 </html>
@@ -1524,82 +1696,74 @@ def init_db():
     conn.commit()
     conn.close()
 
+def get_similar_courses(course_name, df, n=3):
+    """Find similar courses based on course description and skills"""
+    # Combine description and skills for better matching
+    df['combined_features'] = df['description'] + ' ' + df['skills']
+    
+    # Create TF-IDF matrix
+    tfidf = TfidfVectorizer(stop_words='english')
+    tfidf_matrix = tfidf.fit_transform(df['combined_features'])
+    
+    # Calculate similarity scores
+    cosine_sim = cosine_similarity(tfidf_matrix)
+    
+    # Get index of selected course
+    idx = df[df['name'] == course_name].index[0]
+    
+    # Get similarity scores for the course
+    sim_scores = list(enumerate(cosine_sim[idx]))
+    sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
+    
+    # Get top N most similar courses (excluding itself)
+    similar_courses = sim_scores[1:n+1]
+    
+    return [
+        {
+            'name': df.iloc[i[0]]['name'],
+            'similarity': round(i[1] * 100, 1),
+            'platform': df.iloc[i[0]]['platform'],
+            'instructor': df.iloc[i[0]]['instructor'],
+            'rating': df.iloc[i[0]]['rating'],
+            'url': df.iloc[i[0]]['url']
+        }
+        for i in similar_courses
+    ]
+
+@app.route("/similar_courses", methods=["POST"])
+def find_similar_courses():
+    """Endpoint to find similar courses"""
+    data = request.get_json()
+    course_name = data.get("course_name")
+    
+    conn = sqlite3.connect(DATABASE)
+    df = pd.read_sql_query("SELECT * FROM courses", conn)
+    conn.close()
+    
+    similar_courses = get_similar_courses(course_name, df)
+    return jsonify({"similar_courses": similar_courses})
+
 @app.route("/suggest", methods=["POST"])
 def suggest():
-    """Provide skill suggestions and profile comparisons."""
+    """Provide skill suggestions and profile comparisons with skill filtering."""
     data = request.get_json()
     user_skills = set(skill.strip().lower() for skill in data.get("skills", "").split(","))
     specialization = data.get("specialization")
 
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
+    df = pd.read_sql_query("SELECT * FROM courses", conn)
     
-    # Debug: Print the specialization being queried
-    print(f"Querying for specialization: {specialization}")
+    # Filter courses by skills
+    relevant_courses = df[
+        df['skill'].str.lower().isin([s.lower() for s in user_skills]) |
+        df['specialization'].str.lower() == specialization.lower()
+    ]
     
-    # Get all profiles for the specialization
-    cursor.execute("""
-        SELECT name, skills, experience_years, company 
-        FROM users 
-        WHERE specialization = ?
-    """, (specialization,))
+    # Get course recommendations based on skill match
+    course_recommendations = relevant_courses.sort_values('rating', ascending=False).head(3).to_dict('records')
     
-    professionals = cursor.fetchall()
-    
-    # Debug: Print the number of professionals found
-    print(f"Found {len(professionals)} professionals")
-    
-    profile_comparisons = []
-    all_required_skills = set()
-    
-    for prof in professionals:
-        prof_skills = set(skill.strip().lower() for skill in prof[1].split(","))
-        all_required_skills.update(prof_skills)
-        common_skills = user_skills.intersection(prof_skills)
-        similarity_score = len(common_skills) / len(prof_skills) * 100
-        
-        profile_comparisons.append({
-            "name": prof[0],
-            "common_skills": list(common_skills),
-            "missing_skills": list(prof_skills - user_skills),
-            "similarity_score": round(similarity_score, 1),
-            "experience_years": prof[2],
-            "company": prof[3]
-        })
-    
-    # Debug: Print the number of profile comparisons
-    print(f"Generated {len(profile_comparisons)} profile comparisons")
-    
-    # Get course recommendations
-    missing_skills = all_required_skills - user_skills
-    cursor.execute("""
-        SELECT name, skill, platform, url, difficulty, instructor, duration, description, rating
-        FROM courses 
-        WHERE specialization = ? 
-        ORDER BY rating DESC
-        LIMIT 3
-    """, (specialization,))
-    
-    courses = cursor.fetchall()
-    course_recommendations = [{
-        "name": course[0],
-        "skill": course[1],
-        "platform": course[2],
-        "url": course[3],
-        "difficulty": course[4],
-        "instructor": course[5],
-        "duration": course[6],
-        "description": course[7],
-        "rating": course[8]
-    } for course in courses]
-    
-    conn.close()
-
-    return jsonify({
-        "missing_skills": list(missing_skills),
-        "profile_comparisons": profile_comparisons,
-        "course_recommendations": course_recommendations
-    })
+    # ... rest of your existing suggest route code ...
 
 if __name__ == '__main__':
     init_db()
